@@ -1,0 +1,17 @@
+sudo: false
+
+language: go
+go:
+    - 1.7
+    - 1.8
+
+before_install:
+    - go get golang.org/x/tools/cmd/cover
+    - go get github.com/golang/lint/golint
+    - go get github.com/mattn/goveralls
+
+script:
+    - "$HOME/gopath/bin/golint ."
+    - go vet ./...
+    - go test -timeout 1s -race -covermode=atomic -v ./...
+    - $HOME/gopath/bin/goveralls -service=travis-ci
