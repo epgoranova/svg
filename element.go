@@ -20,6 +20,18 @@ func New(source io.Reader) (*Element, error) {
 	return decodeFromSource(xml.NewDecoder(source))
 }
 
+// Render creates an SVG output from the element. Returns an error if the
+// element is empty.
+func (e *Element) Render(w io.Writer) error {
+	encoder := xml.NewEncoder(w)
+
+	if err := encode(e, encoder); err != nil {
+		return fmt.Errorf("Could not render element: %s", err)
+	}
+
+	return encoder.Flush()
+}
+
 // Equal checks if two elements are equivalent.
 func (e *Element) Equal(o *Element) bool {
 	if e.Name != o.Name || e.Content != o.Content ||
@@ -54,6 +66,23 @@ func deserialize(token xml.StartElement) *Element {
 	}
 
 	return element
+}
+
+func serialize(e *Element) xml.StartElement {
+	// TODO: investigate Space attr of Name
+	var attributes []xml.Attr
+	for name, value := range e.Attributes {
+		attr := xml.Attr{
+			Name:  xml.Name{Local: name},
+			Value: value,
+		}
+		attributes = append(attributes, attr)
+	}
+
+	return xml.StartElement{
+		Name: xml.Name{Local: e.Name},
+		Attr: attributes,
+	}
 }
 
 // decodeFromSource creates the first element from the decoder.
@@ -116,4 +145,20 @@ func decode(e *Element, decoder *xml.Decoder) error {
 	}
 
 	return nil
+}
+
+func encode(e *Element, encoder *xml.Encoder) error {
+	start := serialize(e)
+	if err := encoder.EncodeToken(start); err != nil {
+		return err
+	}
+	end := start.End()
+
+	for _, child := range e.Children {
+		if err := encode(child, encoder); err != nil {
+			return err
+		}
+	}
+
+	return encoder.EncodeToken(end)
 }

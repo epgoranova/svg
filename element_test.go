@@ -1,6 +1,7 @@
 package svg_test
 
 import (
+	"bytes"
 	"strings"
 	"testing"
 
@@ -174,6 +175,87 @@ func TestElementNewEmpty(t *testing.T) {
 
 	if actual != nil {
 		t.Errorf("New: expected nil, actual %v", actual)
+	}
+}
+
+func TestElementRender(t *testing.T) {
+	tests := []struct {
+		description string
+		element     *Element
+		expected    string
+	}{
+		{
+			description: "simple element",
+			element: &Element{
+				Name:       "svg",
+				Attributes: map[string]string{"fill": "blue"},
+			},
+			expected: `<svg fill="blue"></svg>`,
+		},
+		{
+			description: "nested element",
+			element: &Element{
+				Name:       "g",
+				Attributes: map[string]string{"stroke": "black"},
+				Children: []*Element{
+					{Name: "path", Attributes: map[string]string{"d": "m 1 2"}},
+					{Name: "path", Attributes: map[string]string{"d": "m 3 4"}},
+				},
+			},
+			expected: `<g stroke="black"><path d="m 1 2"></path><path d="m 3 4"></path></g>`,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.description, func(t *testing.T) {
+			buf := &bytes.Buffer{}
+			if err := test.element.Render(buf); err != nil {
+				t.Fatalf("Render: unexpected error: %s", err)
+			}
+
+			if actual := buf.String(); test.expected != actual {
+				t.Fatalf("Render: expected %s, actual %s",
+					test.expected, buf.String())
+			}
+		})
+	}
+}
+
+func TestElementRenderErrors(t *testing.T) {
+	tests := []struct {
+		description    string
+		element        *Element
+		expectedPrefix string
+	}{
+		{
+			description:    "empty element",
+			element:        &Element{},
+			expectedPrefix: "Could not render element",
+		},
+		{
+			description: "child with no name",
+			element: &Element{
+				Name: "g",
+				Children: []*Element{
+					{Attributes: map[string]string{"fill": "black"}},
+				},
+			},
+			expectedPrefix: "Could not render element",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.description, func(t *testing.T) {
+			err := test.element.Render(&bytes.Buffer{})
+			if err == nil {
+				t.Fatalf("Render: expected error, actual nil")
+			}
+
+			if !strings.HasPrefix(err.Error(), test.expectedPrefix) {
+				t.Fatalf("Render: expected prefix %s, actual %v",
+					test.expectedPrefix, err)
+			}
+		})
 	}
 }
 
